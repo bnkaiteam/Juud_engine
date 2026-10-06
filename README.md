@@ -49,6 +49,9 @@ See [the benchmark guide](bench/README.md) for launch JSON, validity checks, and
 and [the evaluation record](docs/JUUD_EVALUATION.md) for the unfilled comparison table and claim criteria.
 Until the comparison has run successfully, this repository has **no measured Juud_engine versus Strata result**.
 
+For a single H100 with 94 GB, see the [capacity and build guide](docs/H100_SINGLE_GPU.md). Its fit estimates are
+separate from the RTX 4090 benchmark and do not imply a measured H100 speed.
+
 ## Model files and licenses
 
 The full model weights and IQ3_S pack are not included in this repository. A small experimental projection vector
