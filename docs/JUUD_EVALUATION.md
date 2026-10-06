@@ -10,6 +10,12 @@ The original Strata expert-pool workers spin for up to 20 ms before sleeping. Th
 gate/up and down phases of the same batch, they keep Strata's 20 ms window. An explicit `STRATA_POOL_SPIN_US`
 still selects a fixed spin and disables the adaptive policy. The default is the original Strata behavior.
 
+The second opt-in change, `JUUD_SKIP_UNUSED_ACTQ=1`, applies to the single-GPU expert dispatch path. When a token's
+selected experts are all GPU-owned, Juud skips CPU activation quantization for that token. The CPU quantized
+activation is consumed only by CPU expert jobs, so that token has no consumer for it. The default keeps Strata's
+original calculation. The measured comparison enables both changes together; it cannot assign any gain to one
+change without a separate ablation run.
+
 This is motivated by [Strata issue #921](https://github.com/Niko1221/Strata/issues/921), which reports lower CPU
 contention in a GPU-heavy **dual** RTX 4090 configuration and also describes slower wake-ups for CPU-positive
 layers. That report is a hypothesis for this **single** RTX 4090 experiment, not its result.
@@ -32,8 +38,9 @@ with the raw result directory before filling the comparison table:
 | Raw results directory or release artifact | |
 
 Use one shared model pack and identical request bytes for both arms. Build each engine from its pinned source with
-the same compiler and CUDA options. The only intended treatment is the Juud adaptive-spin environment setting.
-Run the paired harness with `STRATA_POOL_SPIN_US` unset, and preserve failed or incomplete requests in the raw data.
+the same compiler and CUDA options. The intended treatment is the pair of Juud environment settings above.
+Run the paired harness with `STRATA_POOL_SPIN_US` unset and both Juud flags enabled only for the Juud arm. Preserve
+failed or incomplete requests in the raw data.
 
 ## Results
 

@@ -23,7 +23,7 @@ Create two local JSON files outside the repository, for example `strata-launch.j
 }
 ```
 
-For Juud_engine, change the Python executable and `cwd` to the Juud checkout. Keep `url` and port identical; the harness starts the servers serially. An optional `"env": {"NAME": "value", "REMOVE_ME": null}` object sets or unsets environment variables for that server; the child engine inherits them. For the adaptive CPU pool experiment, put `"env": {"STRATA_POOL_SPIN_US": null, "JUUD_POOL_ADAPTIVE_SPIN": "1"}` in the Juud launch JSON and clear both variables in the Strata launch JSON. Avoid secrets in the JSON files because their hashes and paths appear in the manifest; review all logs and configurations before publishing.
+For Juud_engine, change the Python executable and `cwd` to the Juud checkout. Keep `url` and port identical; the harness starts the servers serially. An optional `"env": {"NAME": "value", "REMOVE_ME": null}` object sets or unsets environment variables for that server; the child engine inherits them. For the two opt-in changes, put `"env": {"STRATA_POOL_SPIN_US": null, "JUUD_POOL_ADAPTIVE_SPIN": "1", "JUUD_SKIP_UNUSED_ACTQ": "1"}` in the Juud launch JSON and clear all three variables in the Strata launch JSON. Avoid secrets in the JSON files because their hashes and paths appear in the manifest; review all logs and configurations before publishing.
 
 ## Run
 
@@ -39,6 +39,8 @@ python bench/juud_compare.py run `
   --pairs 5
 ```
 
+GPU telemetry is enabled by default at a 1-second interval. It invokes `nvidia-smi` with the query `timestamp,index,utilization.gpu,clocks.sm,power.draw,temperature.gpu,memory.used` and saves one JSONL file per server launch. Pass `--gpu-sample-interval 0` to disable it, or `--gpu-sample-interval 0.5` to poll more often. Use `--nvidia-smi C:/path/to/nvidia-smi.exe` if the command is not on `PATH`. Sampling failures are logged as `error` records and to stderr; they do not invalidate or stop requests. GPU polling itself adds a small, similar background load to both arms, so keep the interval the same for A and B.
+
 `--root` supplies Strata's tokenizer and chat template for sizing prompts. `--pack` is the **shared** IQ3_S pack. The harness verifies both servers report the expected prompt token count. The output directory must be new. Default workloads are 4,096, 32,768 and 128,000 token synthetic Python prompts plus a 2,048 token Korean chat prompt. Each requests 256 generated tokens with `temperature: 0`, `reasoning_effort: none`, streaming and usage included. The early nonce makes prefix reuse observable and normally zero. Pass `--targets 4096,32768` if the configured context cannot fit the 128,000 token prompt plus output.
 
 Each launch gets a small excluded warm-up request, then one request per workload. The harness saves every request body and SHA-256 hash, HTTP stream chunks, output text, engine timings, cache hit rate, draft acceptance where available, token counts and failure flags. It checks that a measured request produces the full 256 tokens, has no reused prefix, and reports valid engine timings. An early EOS or failure stays in the raw data but is excluded from the paired median.
@@ -51,6 +53,7 @@ Files in the output directory:
 - `summary.json` and `summary.md`: paired A/B medians and per-pair gains.
 - `requests/pair-*.json`: exact workload requests and SHA-256 hashes.
 - `server-logs/*`: launch logs, readiness snapshot and warm-up results.
+- `gpu-samples/pair-*-A.jsonl` and `gpu-samples/pair-*-B.jsonl`: timestamped GPU utilization, SM clock, power, temperature and used VRAM. Each measured row and warm-up links to its server's file in `gpu_sampling` and contains a `request_window` with Unix nanosecond and UTC start/end times. The row also summarizes polls overlapping that window; a short request may have zero samples. `nvidia-smi` failures appear as `type: "error"` lines in the same file.
 - `manifest.json`: benchmark options, host/Python details, source commits and dirty state, and launch configuration hashes.
 
 If a run stops early, regenerate the summary from its saved measured rows:
@@ -63,6 +66,6 @@ python bench/juud_compare.py summarize --out C:/path/to/results/rtx4090-iq3s-01
 
 Prefill throughput is freshly processed prompt tokens divided by engine `prompt_ms`; decode throughput is engine generated tokens divided by engine `decode_ms`. TTFT is from sending the request to the first nonempty text or reasoning delta; total latency ends at stream completion. The table's positive percentage means Juud is faster: `B/A - 1` for throughput and `1 - B/A` for latency. Report each workload separately. Do not use total request time to calculate decode tok/s.
 
-The synthetic Python prompts test a narrow workload. The Korean prompt gives another text pattern but is still synthetic. Keep conclusions scoped to these inputs. Save GPU clocks, power, temperature and VRAM sampling alongside `runs.jsonl`; note other workloads running on the PC. Check that the same model files and source/compiler settings were used, inspect output text and MTP draft acceptance, and run separate correctness checks such as `tools/needle_bench.py` and a coding task with tests. A different answer can change speculative draft acceptance even when input bytes match. An exact output match is recorded as a diagnostic, not assumed to be required for every valid answer.
+The synthetic Python prompts test a narrow workload. The Korean prompt gives another text pattern but is still synthetic. Keep conclusions scoped to these inputs. Inspect the recorded GPU clocks, power, temperature and VRAM beside `runs.jsonl`, and note other workloads running on the PC. This harness does not collect CPU process-tree telemetry. Check that the same model files and source/compiler settings were used, inspect output text and MTP draft acceptance, and run separate correctness checks such as `tools/needle_bench.py` and a coding task with tests. A different answer can change speculative draft acceptance even when input bytes match. An exact output match is recorded as a diagnostic, not assumed to be required for every valid answer.
 
 The methodology follows Strata's [community benchmark guide](../docs/COMMUNITY_BENCHMARKS.md) and adapts its [RTX 5090 reproducible harness](results/2026-09-30-community-rtx-5090/benchmark.py).

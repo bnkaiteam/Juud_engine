@@ -8,20 +8,133 @@ downloaded or started until ``run`` is invoked with explicit launch configs.
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
+import math
 import os
 import platform
 import signal
 import statistics
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 from datetime import datetime, timezone
+
+
+GPU_QUERY = "timestamp,index,utilization.gpu,clocks.sm,power.draw,temperature.gpu,memory.used"
+GPU_FIELDS = ("gpu_index", "utilization_gpu_percent", "clocks_sm_mhz", "power_w",
+              "temperature_c", "memory_used_mib")
+
+
+def utc_from_ns(value: int) -> str:
+    return datetime.fromtimestamp(value / 1_000_000_000, timezone.utc).isoformat()
+
+
+def gpu_number(raw: str) -> float | None:
+    try:
+        number = float(raw.strip())
+        return number if math.isfinite(number) else None
+    except ValueError:
+        return None
+
+
+class GpuSampler:
+    """Capture independent nvidia-smi polls while one engine is running."""
+
+    def __init__(self, path: Path, interval_s: float, executable: str, engine_pid: int):
+        self.path = path
+        self.interval_s = interval_s
+        self.executable = executable
+        self.engine_pid = engine_pid
+        self.stop_event = threading.Event()
+        self.lock = threading.Lock()
+        self.samples: list[dict] = []
+        self.thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.thread = threading.Thread(target=self._loop, name=f"gpu-sampler-{self.engine_pid}", daemon=True)
+        self.thread.start()
+
+    def stop(self) -> None:
+        self.stop_event.set()
+        if self.thread is not None:
+            self.thread.join(timeout=15)
+            if self.thread.is_alive():
+                print(f"GPU sampler did not stop promptly; inspect {self.path}", file=sys.stderr)
+
+    def _loop(self) -> None:
+        try:
+            with self.path.open("w", encoding="utf-8", buffering=1) as stream:
+                consecutive_errors = 0
+                while not self.stop_event.is_set():
+                    started_ns = time.time_ns()
+                    try:
+                        result = subprocess.run(
+                            [self.executable, f"--query-gpu={GPU_QUERY}", "--format=csv,noheader,nounits"],
+                            capture_output=True, text=True, timeout=10, check=True,
+                        )
+                        finished_ns = time.time_ns()
+                        lines = list(csv.reader(result.stdout.splitlines()))
+                        if not lines:
+                            raise ValueError("nvidia-smi returned no GPU rows")
+                        for fields in lines:
+                            if len(fields) != 7:
+                                raise ValueError(f"expected 7 CSV fields, received {len(fields)}: {fields!r}")
+                            values = [gpu_number(value) for value in fields[1:]]
+                            if values[0] is None:
+                                raise ValueError(f"invalid GPU index: {fields[1]!r}")
+                            record = {"type": "sample", "engine_pid": self.engine_pid,
+                                      "poll_started_unix_ns": started_ns,
+                                      "poll_finished_unix_ns": finished_ns,
+                                      "sample_unix_ns": (started_ns + finished_ns) // 2,
+                                      "sample_utc": utc_from_ns((started_ns + finished_ns) // 2),
+                                      "nvidia_timestamp": fields[0].strip(),
+                                      "gpu_index": int(values[0]),
+                                      **dict(zip(GPU_FIELDS[1:], values[1:])),
+                                      "raw_csv_fields": [field.strip() for field in fields]}
+                            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+                            with self.lock:
+                                self.samples.append(record)
+                        consecutive_errors = 0
+                    except (OSError, ValueError, UnicodeError, subprocess.SubprocessError) as exc:
+                        consecutive_errors += 1
+                        detail = f"{type(exc).__name__}: {exc}"
+                        if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
+                            detail += f"; stderr: {exc.stderr.strip()[:1000]}"
+                        record = {"type": "error", "engine_pid": self.engine_pid,
+                                  "at_unix_ns": time.time_ns(), "message": detail,
+                                  "consecutive_errors": consecutive_errors}
+                        stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+                        print(f"GPU sampler error ({self.path}): {record['message']}", file=sys.stderr)
+                        if consecutive_errors >= 3 or isinstance(exc, FileNotFoundError):
+                            break
+                    self.stop_event.wait(self.interval_s)
+        except OSError as exc:
+            print(f"GPU sampler could not write {self.path}: {exc}", file=sys.stderr)
+
+    def for_window(self, start_ns: int, end_ns: int) -> dict:
+        """Summarize polls whose timing interval overlaps this request interval."""
+        with self.lock:
+            matches = [sample for sample in self.samples
+                       if sample["poll_started_unix_ns"] <= end_ns and
+                       sample["poll_finished_unix_ns"] >= start_ns]
+        by_gpu: dict[str, dict] = {}
+        for gpu_index in sorted({sample["gpu_index"] for sample in matches}):
+            gpu = [sample for sample in matches if sample["gpu_index"] == gpu_index]
+            metrics = {}
+            for field in GPU_FIELDS[1:]:
+                values = [float(sample[field]) for sample in gpu if sample[field] is not None]
+                metrics[field] = ({"mean": statistics.mean(values), "min": min(values), "max": max(values)}
+                                  if values else None)
+            by_gpu[str(gpu_index)] = {"samples": len(gpu), "metrics": metrics}
+        return {"sample_count": len(matches), "by_gpu": by_gpu}
 
 
 def write_json(path: Path, value: object) -> None:
@@ -268,6 +381,7 @@ def one_request(url: str, case: dict, pair: int, engine_name: str, timeout_s: fl
               "expected_prompt_tokens": case["expected_prompt_tokens"],
               "request_sha256": sha256(body), "max_tokens": case["request"]["max_tokens"]}
     chunks, texts, first, finish, error = [], [], None, None, None
+    request_start_unix_ns = time.time_ns()
     started = time.perf_counter()
     wire = urllib.request.Request(url + "/v1/chat/completions", data=body,
                                   headers={"Content-Type": "application/json"})
@@ -296,6 +410,7 @@ def one_request(url: str, case: dict, pair: int, engine_name: str, timeout_s: fl
     except (OSError, ValueError, TimeoutError) as exc:
         error = {"type": type(exc).__name__, "message": str(exc)}
     elapsed = time.perf_counter() - started
+    request_end_unix_ns = time.time_ns()
     try:
         deadline = time.perf_counter() + 10
         while True:
@@ -327,6 +442,10 @@ def one_request(url: str, case: dict, pair: int, engine_name: str, timeout_s: fl
         isinstance(decode_ms, (int, float)) and decode_ms > 0,
     }
     result.update({"client_ttft_s": first, "client_elapsed_s": elapsed, "finish_reason": finish,
+                   "request_window": {"start_unix_ns": request_start_unix_ns,
+                                      "end_unix_ns": request_end_unix_ns,
+                                      "start_utc": utc_from_ns(request_start_unix_ns),
+                                      "end_utc": utc_from_ns(request_end_unix_ns)},
                    "usage": usage, "engine_metrics": engine, "output_text": "".join(texts),
                    "server_hardware_snapshot": metrics.get("hardware"),
                    "server_hardware_static": metrics.get("hardware_static"),
@@ -337,6 +456,18 @@ def one_request(url: str, case: dict, pair: int, engine_name: str, timeout_s: fl
         result["prefill_tok_s"] = (prompt_tokens - reused) / (prompt_ms / 1000)
         result["decode_tok_s"] = generated / (decode_ms / 1000) if isinstance(generated, int) else None
     return result
+
+
+def attach_gpu_sampling(row: dict, sampler: GpuSampler | None, out: Path) -> None:
+    if sampler is None:
+        return
+    window = row["request_window"]
+    row["gpu_sampling"] = {
+        "file": sampler.path.relative_to(out).as_posix(),
+        "interval_s": sampler.interval_s,
+        "window_match": "nvidia-smi poll interval overlaps request window",
+        **sampler.for_window(window["start_unix_ns"], window["end_unix_ns"]),
+    }
 
 
 def median_range(values: list[float]) -> dict | None:
@@ -398,6 +529,8 @@ def summarize(out: Path) -> dict:
 def run(args: argparse.Namespace) -> None:
     if args.pairs < 1 or args.max_tokens < 1:
         raise ValueError("pairs and max-tokens must be positive")
+    if args.gpu_sample_interval < 0:
+        raise ValueError("gpu-sample-interval must be nonnegative (0 disables sampling)")
     targets = [int(x) for x in args.targets.split(",")]
     if not targets or any(x < 256 for x in targets) or args.ko_target < 256:
         raise ValueError("all prompt targets must be at least 256")
@@ -427,6 +560,10 @@ def run(args: argparse.Namespace) -> None:
                                         "B_config_sha256": sha256(args.b.read_bytes()),
                                         "inference_config_check": config_check,
                                         "required_context": required_context,
+                                        "gpu_sampling": {"enabled": args.gpu_sample_interval > 0,
+                                                         "interval_s": args.gpu_sample_interval,
+                                                         "executable": args.nvidia_smi,
+                                                         "query": GPU_QUERY},
                                         "A_source": source_state(a["cwd"]), "B_source": source_state(b["cwd"]),
                                         "order": "A,B then B,A, repeated; each launch receives one warm-up"})
     with (out / "runs.jsonl").open("a", encoding="utf-8") as stream:
@@ -452,6 +589,15 @@ def run(args: argparse.Namespace) -> None:
                     else:
                         popen_kwargs["start_new_session"] = True
                     proc = subprocess.Popen(cfg["command"], **popen_kwargs)
+                    sampler = None
+                    if args.gpu_sample_interval > 0:
+                        gpu_path = out / "gpu-samples" / f"pair-{pair:03d}-{engine_name}.jsonl"
+                        try:
+                            sampler = GpuSampler(gpu_path, args.gpu_sample_interval, args.nvidia_smi, proc.pid)
+                            sampler.start()
+                        except (OSError, RuntimeError) as exc:
+                            sampler = None
+                            print(f"GPU sampler failed to start ({gpu_path}): {exc}", file=sys.stderr)
                     try:
                         startup_s, health = wait_ready(proc, cfg["url"], args.startup_timeout)
                         expected_actual = max(c["expected_prompt_tokens"] for c in cases) + args.max_tokens + 8
@@ -465,6 +611,7 @@ def run(args: argparse.Namespace) -> None:
                                   "expected_prompt_tokens": count(make_request("Reply with exactly READY.", 16)),
                                   "request": make_request("Reply with exactly READY.", 16)}
                         warmup_row = one_request(cfg["url"], warmup, pair, engine_name, args.request_timeout)
+                        attach_gpu_sampling(warmup_row, sampler, out)
                         write_json(out / "server-logs" / f"pair-{pair:03d}-{engine_name}-warmup.json", warmup_row)
                         warmup_flags = warmup_row["flags"]
                         required_warmup_flags = ("nonempty_output", "prompt_count_matches", "no_prefix_reuse",
@@ -474,12 +621,17 @@ def run(args: argparse.Namespace) -> None:
                                                f"error={warmup_row['error']}, flags={warmup_flags}")
                         for case in cases:
                             row = one_request(cfg["url"], case, pair, engine_name, args.request_timeout)
+                            attach_gpu_sampling(row, sampler, out)
                             stream.write(json.dumps(row, ensure_ascii=False) + "\n")
                             stream.flush()
                             print(f"  {engine_name} {case['case']}: valid={row['valid']} "
                                   f"prefill={row.get('prefill_tok_s')} decode={row.get('decode_tok_s')}", flush=True)
                     finally:
-                        stop_server(proc)
+                        try:
+                            if sampler is not None:
+                                sampler.stop()
+                        finally:
+                            stop_server(proc)
             summarize(out)
     print(f"Results: {out / 'summary.md'}", flush=True)
 
@@ -499,6 +651,10 @@ def main() -> int:
     runner.add_argument("--max-tokens", type=int, default=256)
     runner.add_argument("--startup-timeout", type=float, default=600)
     runner.add_argument("--request-timeout", type=float, default=1800)
+    runner.add_argument("--gpu-sample-interval", type=float, default=1.0,
+                        help="nvidia-smi poll interval in seconds (default: 1; 0 disables)")
+    runner.add_argument("--nvidia-smi", default="nvidia-smi",
+                        help="nvidia-smi executable or full path (default: nvidia-smi)")
     summarizer = sub.add_parser("summarize", help="regenerate summary.json and summary.md from runs.jsonl")
     summarizer.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()

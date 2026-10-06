@@ -1,10 +1,10 @@
 # Juud_engine
 
 Juud_engine is an experimental fork of [Strata](https://github.com/Niko1221/Strata) for local
-[Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) inference. Its first change is an **opt-in**
-CPU expert-pool parking policy intended for GPU-heavy decoding on an RTX 4090. It spins briefly after a completed
-CPU batch while retaining Strata's spin window between the two phases of that batch. The policy has not yet been
-shown to improve performance on this PC.
+[Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) inference. It has two **opt-in** changes:
+a CPU expert-pool parking policy that spins briefly after a completed CPU batch, and a single-GPU path that skips
+CPU activation quantization for a token whose experts all run on the GPU. Neither change has yet been shown to
+improve performance on this PC.
 
 ## Source and status
 
@@ -16,19 +16,22 @@ shown to improve performance on this PC.
   by Strata on other systems; they are not Juud_engine results. A same-machine comparison will be published only
   with its raw measurements and exact settings.
 
-## Try the opt-in policy
+## Try the opt-in changes
 
 Build the engine from **this checkout** so the source change is present. On Windows, run
 `.\START-HERE.bat --build --no-start` and then start normally. The setup process obtains model files separately.
-For a direct run, set `JUUD_POOL_ADAPTIVE_SPIN=1` in the engine environment; the server's configuration also accepts
-`"env": {"JUUD_POOL_ADAPTIVE_SPIN": "1"}`. The default is Strata's original policy. If
-`STRATA_POOL_SPIN_US` is set, its explicit fixed spin value takes precedence.
+For a direct run, set `JUUD_POOL_ADAPTIVE_SPIN=1` and `JUUD_SKIP_UNUSED_ACTQ=1` in the engine environment; the
+server's configuration also accepts `"env": {"JUUD_POOL_ADAPTIVE_SPIN": "1", "JUUD_SKIP_UNUSED_ACTQ": "1"}`.
+The first setting keeps Strata's spin window between the two phases of a CPU expert batch and shortens it after
+the batch finishes. If `STRATA_POOL_SPIN_US` is set, its explicit fixed spin value takes precedence. The second
+setting skips an unused CPU activation quantization only when every expert selected for that token is GPU-owned
+on the single-GPU path. Both default to Strata's original behavior.
 
 ## Reproduce the comparison
 
 Build unmodified Strata at the source commit above and this fork separately. Point both launch configurations at
-the **same IQ3_S pack**, use identical engine options and prompts, and enable `JUUD_POOL_ADAPTIVE_SPIN=1` only for
-the Juud_engine arm. In the launch JSON, set `"STRATA_POOL_SPIN_US": null` for both arms so an inherited value
+the **same IQ3_S pack**, use identical engine options and prompts, and enable `JUUD_POOL_ADAPTIVE_SPIN=1` and
+`JUUD_SKIP_UNUSED_ACTQ=1` only for the Juud_engine arm. In the launch JSON, set `"STRATA_POOL_SPIN_US": null` for both arms so an inherited value
 cannot override the experiment. The paired runner starts the two servers serially and alternates which arm runs
 first:
 
