@@ -1,0 +1,8 @@
+{
+  "name": "Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
+  "bytes": 54817524224,
+  "sha256": "4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3",
+  "verification": "local_sha256",
+  "verified_utc": "2026-10-06T03:17:55.2088233Z",
+  "removed_transfer_segments": 4
+}

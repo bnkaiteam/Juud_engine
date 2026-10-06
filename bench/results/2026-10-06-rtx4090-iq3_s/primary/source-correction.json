@@ -1,0 +1,14 @@
+{
+  "observed_utc": "2026-10-06T03:35:42.231994+00:00",
+  "reason": "Windows backslashes in the runner's git safe.directory argument caused B_source capture to fail",
+  "original_manifest_sha256": "f41c992a7865fef5a259a8490fcd08651409450b8509677283bb63d6cc0be23e",
+  "corrected_manifest_sha256": "c9be2255fbecbec5008c3fd6cd09c5ee8f926fe4198df2feae00779a23cdffaf",
+  "checked_checkout": "local checkout path redacted",
+  "git_commit": "cd565c7a22e604899f834a6a2c19ed0fcc659771",
+  "git_worktree_clean": true,
+  "engine_executable_sha256": "e797b44993cbcff23d5cd686941c1f4a1b381545ea002bbb4f8d0a9940d5ed87",
+  "fields_amended": [
+    "B_source"
+  ],
+  "timing_and_request_rows_amended": false
+}

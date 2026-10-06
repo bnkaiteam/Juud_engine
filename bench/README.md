@@ -2,7 +2,10 @@
 
 `juud_compare.py` measures the **same Qwen3.8-Flash-Next IQ3_S pack on the same PC** through each engine's local Chat Completions API. It runs one server at a time. The order is A, B, B, A across successive pairs to reduce time and temperature drift. A is stock Strata; B is Juud_engine. Model loading is timed separately and excluded from request latency.
 
-This tool has **not** been run against a model as part of its creation. The repository must not claim a percentage improvement until `runs.jsonl` contains real paired results from the RTX 4090.
+The [2026-10-06 RTX 4090 comparison](results/2026-10-06-rtx4090-iq3_s/README.md) publishes completed reports,
+privacy-reduced paired metrics and provenance hashes. Full raw records and exact launch files remain in a local ZIP
+because they include PC paths and complete generated text. The main and output-reproducibility control results use
+different engine settings and are reported separately.
 
 ## Prepare the two builds
 

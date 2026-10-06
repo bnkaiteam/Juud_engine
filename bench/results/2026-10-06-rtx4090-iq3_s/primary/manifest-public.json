@@ -1,0 +1,25 @@
+{
+  "started_utc": "2026-10-06T03:22:29.086145+00:00",
+  "pairs": 5,
+  "targets": [
+    4096,
+    32768,
+    128000
+  ],
+  "ko_target": 2048,
+  "max_tokens": 256,
+  "A_config_sha256": "556fab48c13a06b109463dfe3fd3780ccc11976a897306caf62a166fe61822c5",
+  "B_config_sha256": "33dd0053b25c1133f3815d8793ed9e2af075cd0acc0fc6b66047ef9c1d94826b",
+  "required_context": 128264,
+  "A_source": {
+    "commit": "6f32ec070f23ced9f50e704d854d775da52591ab",
+    "dirty": false
+  },
+  "B_source": {
+    "commit": "cd565c7a22e604899f834a6a2c19ed0fcc659771",
+    "dirty": false,
+    "source_correction": "verified after run; see source-correction.json and original manifest.capture.json"
+  },
+  "order": "A,B then B,A, repeated; each launch receives one warm-up",
+  "normalized_inference_config_sha256": "36206d131c2e9dcc54bfbd4006774892eadf73adbbf627f62ce64bb46f1bd540"
+}

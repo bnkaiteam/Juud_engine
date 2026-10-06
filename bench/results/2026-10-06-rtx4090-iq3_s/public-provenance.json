@@ -1,0 +1,23 @@
+{
+  "note": "The original complete raw capture is preserved locally; only privacy-reduced paired measurements are public.",
+  "primary": {
+    "local_full_raw_runs_sha256": "5d964176d802d13431bbc4f9342c928a12025170c2b8dec41b4290b41e9605a5",
+    "local_full_raw_summary_sha256": "b0fd4c2f2e2db31b394bde6f9c1fe90509250aa22bc282b114c4d4c7f3eef2f4",
+    "local_full_raw_manifest_sha256": "c9be2255fbecbec5008c3fd6cd09c5ee8f926fe4198df2feae00779a23cdffaf",
+    "local_A_launch_sha256": "556fab48c13a06b109463dfe3fd3780ccc11976a897306caf62a166fe61822c5",
+    "local_B_launch_sha256": "33dd0053b25c1133f3815d8793ed9e2af075cd0acc0fc6b66047ef9c1d94826b",
+    "public_metrics_sha256": "87eea5b81b4c486d104a56b259f48ed1f3dabe8d52cc3c5a38377f12340c2815",
+    "public_summary_sha256": "83f3b08b097f118826c32ccb43526ded536f74dc710fc01077860411ac980803",
+    "rows": 40
+  },
+  "control": {
+    "local_full_raw_runs_sha256": "f45ee35cf1bf961cabffa929c6a56e4b266bca32e7b3749fc353b6b8020250e2",
+    "local_full_raw_summary_sha256": "922e637a4c17fef4d073cdb514ae69c7433d5d481b6cc06454dcc47b58af1fba",
+    "local_full_raw_manifest_sha256": "1195f3191c45da1261d26f86ccee95f24a92ae98eb92c4f1768ab4817eae6535",
+    "local_A_launch_sha256": "bb2cbc5edd63a252fdfe95671d8f1bd3813c01bf0744f228e5ccbe9ae4f4a9d2",
+    "local_B_launch_sha256": "77bd9304600a069f8efe5bb0675e7a068c13773338e6dda82d0c865e1b3c9079",
+    "public_metrics_sha256": "8c801a1ca4eade60f3e68db7f24fbb9501f932110f7936ff2fd0ed6b7b45d745",
+    "public_summary_sha256": "9a487aa99cdf5fd09c26bfe6c9876cd15ab91760e14459f13623a3462e70b1b6",
+    "rows": 24
+  }
+}

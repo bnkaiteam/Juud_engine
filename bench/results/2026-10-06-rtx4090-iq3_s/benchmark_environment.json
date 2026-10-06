@@ -1,0 +1,44 @@
+{
+  "captured_utc": "2026-10-06T01:47:40.7754804Z",
+  "gpu": {
+    "name": "NVIDIA GeForce RTX 4090",
+    "memory_total_mib": 24564,
+    "driver_version": "591.86",
+    "compute_capability": "8.9"
+  },
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13700",
+  "physical_ram_bytes": 137167679488,
+  "os_version": "Microsoft Windows NT 10.0.22621.0",
+  "cuda_toolkit": "13.0 V13.0.88",
+  "msvc_compiler": "19.44.35220 x64",
+  "strata_engine_sha256": "c12f2928ab95c5defc54a5cf9e3c4d9f1f2442dd60a0bc97e44a41c1fe1cd395",
+  "juud_engine_sha256": "e797b44993cbcff23d5cd686941c1f4a1b381545ea002bbb4f8d0a9940d5ed87",
+  "model_repository": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF",
+  "model_revision": "ed59f92082b1e93c0e96d60a8b11aab089b52f09",
+  "model_quantization": "IQ3_S",
+  "model_files": [
+    {
+      "name": "Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
+      "bytes": 54817524224,
+      "sha256": "4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3",
+      "verification": "local_sha256",
+      "verified_utc": "2026-10-06T03:17:55.2088233Z",
+      "removed_transfer_segments": 4
+    },
+    {
+      "name": "Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf",
+      "bytes": 28800138432,
+      "sha256": "316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113",
+      "verification": "local_sha256",
+      "verified_utc": "2026-10-06T03:13:32.4590400Z",
+      "removed_transfer_segments": 4
+    }
+  ],
+  "mtp_repository": "Qwen/Qwen3.8-Flash-Next",
+  "mtp_revision": "de4b8e4d43b917e7706784d8bb445c9af86a3540",
+  "mtp_tensors": 31,
+  "mtp_manifest_sha256": "6d0b9f960bde353913af870d2095304922d2218131943b3df6a8a0a253368975",
+  "mtp_runtime_experts_sha256": "09398406be61f1f54c93861f449e48b8df0bfccbc9ec9b2b7636775a6ea9244f",
+  "mtp_runtime_dense_sha256": "c724dc0b0822ada5d2977bf5bde821605feabaa64ea2e0045b67ca656329070a",
+  "pack_index_sha256": "b2a014878c3b61d6a6f915e194055a5e68ede34f9465dd1cb13249d902f008ac"
+}

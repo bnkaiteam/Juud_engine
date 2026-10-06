@@ -5,8 +5,8 @@
 Juud_engine is an experimental fork of [Strata](https://github.com/Niko1221/Strata) for local
 [Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) inference. It has two **opt-in** changes:
 a CPU expert-pool parking policy that spins briefly after a completed CPU batch, and a single-GPU path that skips
-CPU activation quantization for a token whose experts all run on the GPU. Neither change has yet been shown to
-improve performance on this PC.
+CPU activation quantization for a token whose experts all run on the GPU. A paired RTX 4090 comparison is now
+[published with privacy-reduced per-pair measurements](bench/results/2026-10-06-rtx4090-iq3_s/README.md).
 
 ## Source and status
 
@@ -14,9 +14,13 @@ improve performance on this PC.
   [`6f32ec070f23ced9f50e704d854d775da52591ab`](https://github.com/Niko1221/Strata/tree/6f32ec070f23ced9f50e704d854d775da52591ab).
 - Changes in this fork: see the repository diff against that commit. The original Strata copyright notice and
   [MIT license](LICENSE) are retained.
-- **No RTX 4090 speedup is claimed yet.** The speed figures in the preserved upstream README below were measured
-  by Strata on other systems; they are not Juud_engine results. A same-machine comparison will be published only
-  with its raw measurements and exact settings.
+- On one RTX 4090 with the shared Qwen3.8-Flash-Next IQ3_S pack, five paired runs per workload showed median
+  **paired decode-speed gains of +9.1% (4K code), +3.6% (32K code), +3.1% (128K code), and +7.5% (2K Korean)**
+  with both Juud options enabled. The A/B output hashes matched in 4/5, 1/5, 0/5, and 0/5 pairs respectively;
+  output-path differences can affect timing, so these gains cannot be attributed solely to the code changes.
+  A separate three-pair control using Strata's reproducibility settings had identical A/B output hashes in all
+  12 pairs; its [measurements and different settings](bench/results/2026-10-06-rtx4090-iq3_s/README.md) are reported separately.
+  The speed figures in the preserved upstream README below were measured by Strata on other systems.
 
 ## Try the opt-in changes
 
@@ -47,9 +51,9 @@ python bench/juud_compare.py run `
   --pairs 5
 ```
 
-See [the benchmark guide](bench/README.md) for launch JSON, validity checks, and generated raw and summary files,
-and [the evaluation record](docs/JUUD_EVALUATION.md) for the unfilled comparison table and claim criteria.
-Until the comparison has run successfully, this repository has **no measured Juud_engine versus Strata result**.
+See [the benchmark guide](bench/README.md) for launch JSON, validity checks, and generated raw and summary files;
+[the evaluation record](docs/JUUD_EVALUATION.md) and [published RTX 4090 results](bench/results/2026-10-06-rtx4090-iq3_s/README.md)
+provide the measured comparison and exact provenance.
 
 For a single H100 with 94 GB, see the [capacity and build guide](docs/H100_SINGLE_GPU.md). Its fit estimates are
 separate from the RTX 4090 benchmark and do not imply a measured H100 speed.

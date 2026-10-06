@@ -156,7 +156,7 @@ def sha256(data: bytes) -> str:
 
 
 def source_state(cwd: str) -> dict:
-    prefix = ["git", "-c", f"safe.directory={cwd}", "-C", cwd]
+    prefix = ["git", "-c", f"safe.directory={Path(cwd).resolve().as_posix()}", "-C", cwd]
     try:
         sha = subprocess.run(prefix + ["rev-parse", "HEAD"], capture_output=True, text=True,
                              check=True, timeout=10).stdout.strip()
@@ -309,6 +309,8 @@ def engine_config(launch: dict, pack: Path) -> tuple[dict, dict]:
     # Text-only benchmarking: vision reserves VRAM even without an image.
     if comparison.get("vision"):
         raise ValueError(f"{config_path}: turn vision off in both configurations for this benchmark")
+    if comparison.get("effort_position", "start") != "start":
+        raise ValueError(f"{config_path}: prompt counts require effort_position=start")
     return comparison, {"path": str(config_path), "sha256": sha256(config_path.read_bytes()),
                         "exe": str(config_file(cfg["exe"])), "max_context_config":
                         int(args[args.index("--max-context") + 1]) if "--max-context" in args else None}
