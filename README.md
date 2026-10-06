@@ -1,289 +1,87 @@
 # Juud_engine
 
-**English** · [한국어](README.ko.md)
+**Measured faster decoding for local Qwen3.8-Flash-Next on one RTX 4090.**
 
-Juud_engine is an experimental fork of [Strata](https://github.com/Niko1221/Strata) for local
-[Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) inference. It has two **opt-in** changes:
-a CPU expert-pool parking policy that spins briefly after a completed CPU batch, and a single-GPU path that skips
-CPU activation quantization for a token whose experts all run on the GPU. A paired RTX 4090 comparison is now
-[published with privacy-reduced per-pair measurements](bench/results/2026-10-06-rtx4090-iq3_s/README.md).
+[한국어](README.ko.md) · [Why Juud?](docs/WHY_JUUD.md) · [RTX 4090 results and paired metrics](bench/results/2026-10-06-rtx4090-iq3_s/README.md)
 
-## Source and status
+Juud_engine is an experimental fork of [Strata](https://github.com/Niko1221/Strata) v0.1.39. It keeps Strata's
+local inference server and adds two **opt-in** engine changes aimed at CPU work during decoding. On a single RTX 4090
+with Qwen3.8-Flash-Next IQ3_S, median paired **decode throughput** improved in all four tested workloads against
+the pinned [Strata `6f32ec0`](https://github.com/Niko1221/Strata/tree/6f32ec070f23ced9f50e704d854d775da52591ab).
 
-- Upstream source: Strata v0.1.39, commit
-  [`6f32ec070f23ced9f50e704d854d775da52591ab`](https://github.com/Niko1221/Strata/tree/6f32ec070f23ced9f50e704d854d775da52591ab).
-- Changes in this fork: see the repository diff against that commit. The original Strata copyright notice and
-  [MIT license](LICENSE) are retained.
-- On one RTX 4090 with the shared Qwen3.8-Flash-Next IQ3_S pack, five paired runs per workload showed median
-  **paired decode-speed gains of +9.1% (4K code), +3.6% (32K code), +3.1% (128K code), and +7.5% (2K Korean)**
-  with both Juud options enabled. The A/B output hashes matched in 4/5, 1/5, 0/5, and 0/5 pairs respectively;
-  output-path differences can affect timing, so these gains cannot be attributed solely to the code changes.
-  A separate three-pair control using Strata's reproducibility settings had identical A/B output hashes in all
-  12 pairs; its [measurements and different settings](bench/results/2026-10-06-rtx4090-iq3_s/README.md) are reported separately.
-  The speed figures in the preserved upstream README below were measured by Strata on other systems.
+## Why try Juud_engine?
 
-## Try the opt-in changes
+1. **Measured decode gains on the tested PC.** The normal adaptive run measured +3.1% to +9.1% median paired
+   decode throughput across four prompts, with five pairs per prompt. A separate three-pair control with identical
+   A/B output text measured +9.6% to +15.6% under different reproducibility settings.
+2. **Less avoidable CPU work by design.** Workers shorten their spin after a completed CPU expert batch, while
+   retaining Strata's longer window between phases of that batch. On a single GPU, mixed multi-token batches can
+   skip CPU activation quantization for tokens whose selected experts all run on the GPU.
+3. **A checkable comparison.** The repository includes source changes, pair-level measurements, request/output
+   hashes, model and binary hashes, methodology, and a [verification script](bench/verify_public_metrics.py).
 
-Build the engine from **this checkout** so the source change is present. On Windows, run
-`.\START-HERE.bat --build --no-start` and then start normally. The setup process obtains model files separately.
-For a direct run, set `JUUD_POOL_ADAPTIVE_SPIN=1` and `JUUD_SKIP_UNUSED_ACTQ=1` in the engine environment; the
-server's configuration also accepts `"env": {"JUUD_POOL_ADAPTIVE_SPIN": "1", "JUUD_SKIP_UNUSED_ACTQ": "1"}`.
-The first setting keeps Strata's spin window between the two phases of a CPU expert batch and shortens it after
-the batch finishes. If `STRATA_POOL_SPIN_US` is set, its explicit fixed spin value takes precedence. The second
-setting skips an unused CPU activation quantization only when every expert selected for that token is GPU-owned
-on the single-GPU path. Both default to Strata's original behavior.
+Both changes are off by default. **Build this checkout and use `RUN-JUUD` to enable the measured path.** A normal
+Strata prebuilt from the default setup flow does not include Juud's source changes.
 
-## Reproduce the comparison
+## Measured against Strata v0.1.39
 
-Build unmodified Strata at the source commit above and this fork separately. Point both launch configurations at
-the **same IQ3_S pack**, use identical engine options and prompts, and enable `JUUD_POOL_ADAPTIVE_SPIN=1` and
-`JUUD_SKIP_UNUSED_ACTQ=1` only for the Juud_engine arm. In the launch JSON, set `"STRATA_POOL_SPIN_US": null` for both arms so an inherited value
-cannot override the experiment. The paired runner starts the two servers serially and alternates which arm runs
-first:
+Each request generated 256 tokens with the same IQ3_S pack on the same RTX 4090 PC. These percentages are medians
+of matched A/B ratios; positive values favor Juud_engine. Model startup is excluded.
+
+| Prompt | Normal decode gain, 5 pairs | Normal full-response latency gain | Identical-output control decode gain, 3 pairs |
+| --- | ---: | ---: | ---: |
+| Code, 4K tokens | +9.1% | +5.6% | +14.7% |
+| Code, 32K tokens | +3.6% | +1.4% | +9.6% |
+| Code, 128K tokens | +3.1% | +0.5% | +15.6% |
+| Korean, 2K tokens | +7.5% | +4.3% | +14.2% |
+
+In the normal run, A/B output text matched in only **5/20 pairs**. Different continuations and MTP draft acceptance
+can affect timing, so these numbers do not isolate the code changes. The separate control used Strata's
+reproducibility settings in **both** arms and matched output text in **12/12 pairs**. Its cache and PCIe settings
+differ from the normal run; do not pool the results. The two Juud changes were enabled together, without an
+individual ablation. See the [full method, latencies, limitations, and public paired metrics](bench/results/2026-10-06-rtx4090-iq3_s/README.md).
+
+## Run the tested Juud path
+
+For NVIDIA CUDA 13 on Windows, first build the engine from this source and choose the Qwen3.8-Flash-Next **IQ3_S**
+model size in setup to match the comparison above. Setup may need build tools and a large separate model download.
+When reconfiguring an existing install, select the intended model, size and settings. Re-run the setup command after
+a source update or when converting an existing Strata install; `--build` alone on an ordinary start of an installed
+model does **not** rebuild.
 
 ```powershell
-python bench/juud_compare.py run `
-  --a "C:/path/to/strata-launch.json" `
-  --b "C:/path/to/juud-launch.json" `
-  --root "C:/path/to/Strata" `
-  --pack "D:/path/to/shared-IQ3_S-pack-dir" `
-  --out "C:/path/to/new-results-dir" `
-  --pairs 5
+git clone https://github.com/bnkaiteam/Juud_engine.git
+cd Juud_engine
+.\START-HERE.bat --setup --build --no-start --family qwen --model IQ3_S
+.\RUN-JUUD.bat
 ```
 
-See [the benchmark guide](bench/README.md) for launch JSON, validity checks, and generated raw and summary files;
-[the evaluation record](docs/JUUD_EVALUATION.md) and [published RTX 4090 results](bench/results/2026-10-06-rtx4090-iq3_s/README.md)
-provide the measured comparison and exact provenance.
+On Linux with an NVIDIA CUDA 13 local build toolchain:
 
-For a single H100 with 94 GB, see the [capacity and build guide](docs/H100_SINGLE_GPU.md). Its fit estimates are
-separate from the RTX 4090 benchmark and do not imply a measured H100 speed.
-
-## Model files and licenses
-
-The full model weights and IQ3_S pack are not included in this repository. A small experimental projection vector
-inherited from Strata is present in `data/experimental-speed-projection` under the Qwen Community License.
-Each downloaded model and quantization has its own terms.
-The official Qwen3.8-Flash-Next model uses the
-[Qwen Community License 1.0](https://huggingface.co/Qwen/Qwen3.8-Flash-Next/blob/main/LICENSE), including a
-separate-license requirement for certain commercial Model-as-a-Service or AI work assistant businesses. Check
-the license attached to the exact model files you use. Third-party code and assets in this fork keep their own
-notices; [Strata's license notes](docs/HOW_IT_WORKS.md#license) list them.
-
----
-
-## Upstream Strata README
-
-The following upstream documentation is preserved from the source commit above. Its install instructions and
-benchmark figures describe Strata; use the Juud_engine notes above for this fork's opt-in change and comparison.
-
-<h1 align="center">Strata</h1>
-
-**English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português](README.pt-BR.md)
-
-<p align="center"><b>Run a 125-billion-parameter AI model on your own gaming PC</b><br>
-NVIDIA or AMD graphics card (12 GB or more) · Windows or Linux · free and open source</p>
-
-<p align="center"><a href="https://github.com/Niko1221/Strata/releases/download/v0.1.10/Pagoda.mp4"><img src="docs/media/pagoda-preview.webp" width="720" alt="A voxel pagoda garden that Strata's model wrote, running in the browser"></a><br>
-<sub>A voxel pagoda garden, 1 shot prompt running on an RTX 5070 with Strata (IQ3_S, 128K context) ·
-<a href="https://github.com/Niko1221/Strata/releases/download/v0.1.10/Pagoda.mp4">full video (49 s)</a></sub></p>
-
-Strata runs **[Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)** on a normal PC. This is a
-large, smart AI model that usually needs a server. It chats, writes code, reads pictures and works with your apps
-and coding agents. Nothing leaves your PC.
-
-## How fast is it?
-
-We measured it on two ordinary gaming PCs. A token is about ¾ of a word.
-
-- **Writes answers:** how fast the reply appears in a short chat. 60 tokens per second is faster than you can read.
-- **Reads your prompt:** how fast it takes in what you send (here a 32K-token document, code or chat history).
-
-<table>
-<tr><th>NVIDIA: RTX 5070 (12 GB), Ryzen 5 7600, 64 GB RAM</th><th>AMD: RX 9070 XT (16 GB), Ryzen 9 3900X, 47 GB RAM</th></tr>
-<tr><td>
-
-| Size | Writes answers | Reads your prompt |
-| --- | ---: | ---: |
-| **Q2_0** | 94 tokens/s | 2,650 tokens/s |
-| **IQ2_XS** | 79 tokens/s | 2,090 tokens/s |
-| **IQ3_XXS** | 62 tokens/s | 1,750 tokens/s |
-| **IQ3_S** | 53 tokens/s | 1,620 tokens/s |
-| **Coder** | 55 tokens/s | 2,180 tokens/s |
-
-</td><td>
-
-| Size | Writes answers | Reads your prompt |
-| --- | ---: | ---: |
-| **Q2_0** | 60 tokens/s | 1,160 tokens/s |
-| **IQ2_XS** | 52 tokens/s | 1,110 tokens/s |
-| **Coder** | 44 tokens/s | 1,420 tokens/s |
-
-</td></tr>
-</table>
-
-NVIDIA: Q2_0 with engine 0.1.36, the other rows with 0.1.26 (4K answers, 32K prompts). The full tables are in
-[DETAILS.md](docs/DETAILS.md#speed-measured). A card with more VRAM is faster: an RTX 3090 (24 GB) should write
-about 100-140 tokens per second. Long chats and other cards: [speed of each model](docs/MODELS.md#how-fast-is-each-size),
-[community results](docs/COMMUNITY_BENCHMARKS.md).
-
-<p align="center"><a href="https://buymeacoffee.com/strataengine"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50"></a><br>
-<sub>Strata is free. If it runs well on your PC, a coffee keeps the work on it going.</sub></p>
-
-## What you need
-
-| | |
-| --- | --- |
-| **Graphics card** | **NVIDIA** GeForce RTX 20, 30, 40 or 50 series, or **AMD** Radeon RX 7900 XT / XTX, RX 7800 XT / 7700 XT, RX 9060 XT, RX 9070 / 9070 XT, Radeon AI PRO R9700 or RX 6800 / 6900 series. It needs **12 GB of VRAM or more**. |
-| **RAM** | 32 GB or more. Your RAM decides [which model](#which-model-should-i-pick) fits. 64 GB runs every size. |
-| **Disk** | About 80 GB free. Use an SSD if you can: the first start is much faster. |
-| **System** | Windows 10 / 11 or Linux, and a current graphics driver from NVIDIA or AMD. |
-
-The installer sets up everything else. Two or three cards can share the model ([multi-GPU](docs/MULTI_GPU.md)).
-
-Experimental, written and tested by community members on their own machines:
-
-- **Older graphics cards** (Tesla P40 / V100, GTX 10, Radeon VII / MI50, RX 6700 XT, RX 5500 XT): [Older GPUs](docs/OLDER_GPUS.md).
-- **Intel Arc**, built from source on Linux: [Intel Arc](docs/INTEL_ARC.md).
-- **Older processors without AVX2**: they work, but slowly. [Older CPUs](docs/INSTALL.md#older-cpus-experimental).
-
-The full list: [docs/INSTALL.md](docs/INSTALL.md#what-you-need).
-
-## Install
-
-### Let your AI set it up
-
-Do you use an AI coding assistant (Claude Code, Cursor, Codex, GitHub Copilot, ...)? Paste this into it:
-
-```text
-Set up Strata on this PC for me: https://github.com/Niko1221/Strata - follow docs/AI_SETUP.md in that repository.
+```sh
+git clone https://github.com/bnkaiteam/Juud_engine.git
+cd Juud_engine
+./setup.sh --setup --build --no-start --family qwen --model IQ3_S
+./RUN-JUUD.sh
 ```
 
-It checks your graphics card, RAM and disk and picks the model that fits. Then it installs and starts it and tells
-you how to connect your apps. AI tools can also install, start and stop Strata through its
-[MCP server](docs/MCP_SERVER.md).
+`RUN-JUUD` checks the selected model's engine path and the `BUILD.json` record for a local build and source
+fingerprint matching this checkout. It clears any fixed `STRATA_POOL_SPIN_US` override, then enforces
+`JUUD_POOL_ADAPTIVE_SPIN=1` and `JUUD_SKIP_UNUSED_ACTQ=1`, even if a saved model config has conflicting values.
+It rejects installs recorded as Strata prebuilts; the build record is not a cryptographic attestation of the binary.
+You can pass ordinary setup/start arguments to the wrapper. The engine still exposes Strata's OpenAI-compatible local API. See the [benchmark guide](bench/README.md)
+to reproduce the comparison and [evaluation record](docs/JUUD_EVALUATION.md) for detailed provenance.
 
-### Or do it yourself
+## Scope and provenance
 
-[Download Strata](https://github.com/Niko1221/Strata/archive/refs/heads/main.zip) and unzip it (or `git clone` it).
-**Windows:** double-click **`START-HERE.bat`**. **Linux:** run **`./setup.sh`** in the Strata folder.
+This is a single-GPU, single-request RTX 4090 result. It does not establish a speed, quality, power, concurrent
+throughput, or reliability advantage on other systems. The observed prefill and time-to-first-token changes were
+small. A [single-H100 capacity and build guide](docs/H100_SINGLE_GPU.md) is available; H100 speed is unmeasured.
+The full raw capture, which includes PC paths and complete generated text, is kept locally; GitHub contains
+privacy-reduced paired metrics and original file hashes.
 
-The steps are the same for NVIDIA and AMD. The installer finds your card and sets up the right engine for it. It
-asks you a few questions:
-
-- which model and which size,
-- how much context (how much text the model keeps in mind),
-- whether it should read pictures.
-
-Press Enter each time for the recommended answer. Then it downloads the model (about 70 GB) and starts it. If the
-download stops, run it again: it continues where it left off. Your browser opens the Strata app at
-`http://127.0.0.1:8080`.
-
-> **While the model starts, your PC can be slow or stop responding for 1-3 minutes** (longest the first time).
-> Strata loads 35-55 GB into your RAM and locks part of it for the graphics card. This is normal. Wait, and don't
-> close the window. The window shows what Strata is doing.
-
-**Next time**, run `START-HERE.bat` (or `./setup.sh`) again. It starts right away and downloads nothing twice. Close
-its window to stop the model. `UPDATE.bat` (`./update.sh`) updates Strata without starting it. Updating, Docker,
-several cards, where the files go and every option: [docs/INSTALL.md](docs/INSTALL.md).
-
-## Which model should I pick?
-
-The installer recommends one for your RAM. The same model comes in several sizes, compressed more or less. Smaller
-sizes are faster. Larger sizes are a bit smarter.
-
-| Your RAM | Take | Why |
-| --- | --- | --- |
-| **32 GB** | **Coder** | it fits 32 GB, and it is made for code (with a 24 GB card, Q2_0 and IQ2_XS run too) |
-| **48 GB** | **IQ2_XS** (or Q2_0, the fastest) | the larger sizes do not fit |
-| **64 GB** | **IQ2_XS** (recommended), or IQ3_XXS / IQ3_S | every size fits; IQ3_S is the best and the slowest |
-| **96 GB or more** | **IQ3_S**, or Unsloth's UD-IQ4_XS (~4-bit) | room for the largest sizes with everything else open |
-
-- **[Coder](docs/MODELS.md#coder):** a coding version with half of the experts removed. It reaches 91% of the full
-  model's SWE-bench Verified score (measured by its authors) and fits 32 GB of RAM. It is weaker outside code,
-  including Chinese and other CJK text (#438). For those, take Q2_0, IQ2_XS or IQ3_S, which keep every expert.
-- **[Swift 1.5](docs/MODELS.md#swift-15):** a fine-tune that thinks for a much shorter time before it answers. You
-  get the answer sooner, at about the same quality.
-- **[Unsloth UD-IQ4_XS](docs/MODELS.md#unsloth-ud-iq4_xs):** Unsloth's ~4-bit version, between IQ3_S and
-  UD-Q4_K_XL in quality. A 94 GB download. With less than ~80 GB of RAM, Strata reads part of it from the SSD
-  while it answers, so it is slower there (an NVMe SSD helps).
-- **[Unsloth UD-Q4_K_XL](docs/MODELS.md#unsloth-ud-q4_k_xl-experimental)** (experimental): the closest to the full
-  model. But Strata reads most of it from the SSD while it answers, so it writes only 7-8.5 tokens/s on a 64 GB PC.
-- **[OrcaRouter's Uncensored IQ3_XXS](docs/MODELS.md#orcarouter-uncensored-iq3_xxs):** you set it up by hand. It is
-  not in the installer's menu.
-
-Sizes, downloads and what fits where: [docs/MODELS.md](docs/MODELS.md). To add another model later, run
-`SETUP.bat` (Linux: `./setup.sh --setup`).
-
-## Using it
-
-<p align="center"><img src="docs/media/runpagoda.png" width="900" alt="The Strata app's Monitor tab next to a coding agent"><br>
-<sub>The Strata app's <b>Monitor</b> (left) while a coding agent writes the pagoda garden from the video (right)</sub></p>
-
-- **In the browser:** open `http://127.0.0.1:8080`. It has **Chat**, a live **Monitor** of the model and your
-  GPU/CPU/RAM, and **About** with the settings and addresses.
-- **Your apps and coding agents:** add an "OpenAI-compatible" provider with the base URL
-  **`http://127.0.0.1:8080/v1`**. Any API key and any model name work.
-  - Apps that use Anthropic's API: `http://127.0.0.1:8080/v1/messages` (Claude Code:
-    `ANTHROPIC_BASE_URL=http://127.0.0.1:8080`).
-  - Codex CLI and other apps that use the OpenAI Responses API: `/v1/responses`
-    ([setup](docs/DETAILS.md#the-responses-api-and-codex-cli)).
-- **Thinking:** choose **off, low, medium or high** in the chat menu or in your app's "reasoning effort". Off is the
-  fastest. High is best for hard questions.
-- **Pictures:** say yes to "Images?" in setup. Then click **Picture** in the chat, or attach pictures in your app.
-  AMD cards read pictures on Linux through the processor; on Windows they can't yet.
-- **From your phone or another PC:** `START-HERE.bat --setup --host 0.0.0.0 --api-key <secret>`. Always set a key.
-- **One request at a time:** by default Strata answers one request, and the others wait. To answer several at once,
-  set `"parallel": 2` ([BATCHING.md](docs/BATCHING.md)). On a 12 GB card this makes each answer slower.
-- **Long prompts:** Strata reads the first message of a chat in full, about 1 minute per 30,000 tokens. Follow-up
-  messages start in seconds.
-
-More: [where your chats are stored](docs/INSTALL.md#where-things-are-stored), [the API](docs/DETAILS.md#using-it).
-
-## Something went wrong?
-
-- **My PC froze the first time Strata started.** This is normal while it loads the model. Wait, and don't close the
-  window. Still frozen after 10 minutes? Restart the PC, close other programs and try again, or pick a smaller size.
-- **It stopped while downloading or installing.** Run `START-HERE.bat` (or `./setup.sh`) again. It continues where
-  it stopped.
-- **It's very slow and the disk light keeps blinking, or it says "the engine stopped unexpectedly".** Your PC does
-  not have enough free RAM. Close other programs (browsers use a lot), or pick a smaller size (Q2_0 or IQ2_XS).
-- **It says port 8080 is already in use.** Strata is already running. Look for its window.
-
-More problems and their fixes: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md). Still stuck? Open an
-[issue](https://github.com/Niko1221/Strata/issues) and attach `strata-<model>.log` from the Strata folder. Found a
-security problem? Report it privately: [SECURITY.md](SECURITY.md).
-
-## How does it work?
-
-Models like this one usually run on servers with hundreds of gigabytes of graphics memory. Your graphics card has
-12-24 GB. Strata makes the model fit by **sharing the work across your whole PC**. Think of a kitchen: the things
-you use all the time stay on the counter, and the rest waits in the pantry.
-
-<p align="center"><img src="docs/media/how-it-works.svg" width="860" alt="The model's 24,576 experts: the busiest on the graphics card, all of them in RAM, a lookup table on the SSD"></p>
-
-- **The model is a team of 24,576 small specialists ("experts").** Each word needs only 10 of them.
-- **Your graphics card** keeps the few thousand experts that are used most often. **Your RAM** holds all of them,
-  and **your processor** works on the rest at the same time. **Your SSD** holds a big lookup table.
-
-<p align="center"><img src="docs/media/guess-and-check.svg" width="860" alt="A small helper guesses the next words; the big model checks them all at once and keeps the right ones"></p>
-
-- **Guess, then check:** a small helper guesses the next few words. The big model checks them all at once. You get
-  the same answer, 1.6-1.8x sooner.
-- **Long texts are read in big pieces** (up to 8,192 tokens at a time), at over 1,000 tokens per second.
-
-The longer explanation: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md). Every part and its numbers:
-[the details](docs/DETAILS.md#how-it-works) and the [paper](docs/paper/Strata-Paper.pdf).
-
-## Credits and license
-
-The model is [Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) by the Qwen team. It was
-compressed by [ISTA-DASLab](https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF), UkisAI (Swift 1.5)
-and Unsloth. Strata uses parts of [llama.cpp / ggml](https://github.com/ggml-org/llama.cpp). All credits:
-[docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md#credits). Strata is open source under the [MIT License](LICENSE). A few
-parts and every model have their own licenses ([which ones](docs/HOW_IT_WORKS.md#license)).
-
-## Support Strata
-
-Strata is free and open source. If it is useful to you, you can support its development:
-
-<p align="center"><a href="https://buymeacoffee.com/strataengine"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50"></a></p>
+Juud_engine retains [Strata's MIT license](LICENSE). Model weights are not in this repository. The official
+[Qwen3.8-Flash-Next model](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) uses the Qwen Community License 1.0;
+check the terms of the exact model and quantization before providing a service. Other inherited third-party
+notices remain in the source. The [preserved Strata README](UPSTREAM_README.md) contains upstream documentation,
+download links, and benchmark figures; those figures are not Juud_engine measurements.

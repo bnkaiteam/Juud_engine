@@ -1,3 +1,5 @@
+> **关于 Juud_engine：**本页是存档的 Strata 文档译文。此页的下载链接和性能测试数据属于 Strata。Juud_engine 在 RTX 4090 上的实测对比和源码编译步骤，请参阅 [Juud_engine README](README.md)。
+
 <h1 align="center">Strata</h1>
 
 [English](README.md) · **简体中文** · [日本語](README.ja.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português](README.pt-BR.md)

@@ -12,9 +12,10 @@ The original Strata expert-pool workers spin for up to 20 ms before sleeping. Th
 gate/up and down phases of the same batch, they keep Strata's 20 ms window. An explicit `STRATA_POOL_SPIN_US`
 still selects a fixed spin and disables the adaptive policy. The default is the original Strata behavior.
 
-The second opt-in change, `JUUD_SKIP_UNUSED_ACTQ=1`, applies to the single-GPU expert dispatch path. When a token's
-selected experts are all GPU-owned, Juud skips CPU activation quantization for that token. The CPU quantized
-activation is consumed only by CPU expert jobs, so that token has no consumer for it. The default keeps Strata's
+The second opt-in change, `JUUD_SKIP_UNUSED_ACTQ=1`, applies to the single-GPU expert dispatch path in a **mixed
+multi-token batch**: some tokens need CPU experts, while another token's selected experts are all GPU-owned. Juud
+skips CPU activation quantization for the GPU-only token, whose activation has no CPU job that can consume it.
+Strata already skips the calculation when the whole batch needs no CPU experts. The default keeps Strata's
 original calculation. The measured comparison enables both changes together; it cannot assign any gain to one
 change without a separate ablation run.
 

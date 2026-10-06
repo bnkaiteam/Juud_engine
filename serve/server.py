@@ -1575,6 +1575,27 @@ def child_env(cfg: dict) -> dict:
     return env
 
 
+def juud_guard_engine(exe: str, env: dict) -> dict:
+    """Make RUN-JUUD's source-build and opt-in promise hold for the selected model config."""
+    if os.environ.get("JUUD_REQUIRE_SOURCE_BUILD") != "1":
+        return env
+    expected = ROOT / "engine" / ("strata.exe" if os.name == "nt" else "strata")
+    if Path(exe).resolve() != expected.resolve():
+        raise SystemExit("[juud] selected model config points to a different engine. "
+                         "Run setup with --setup --build --no-start for this model, then retry RUN-JUUD.")
+    from check_juud_build import verify_source_build  # imported only for RUN-JUUD starts
+    try:
+        verify_source_build(Path(exe))
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"[juud] {error}") from error
+    # A saved config's env is applied after the wrapper's environment; enforce the
+    # measured options here, immediately before the engine process is started.
+    env.pop("STRATA_POOL_SPIN_US", None)
+    env["JUUD_POOL_ADAPTIVE_SPIN"] = "1"
+    env["JUUD_SKIP_UNUSED_ACTQ"] = "1"
+    return env
+
+
 def vision_env(cfg: dict, env: dict) -> dict:
     """The image encoder's environment: the engine's, unless the config's vision section names its own "cuda_device"
     (numbered like nvidia-smi) - then the encoder runs on that card alone, so a spare GPU can hold it while the engine
@@ -3990,6 +4011,7 @@ def main() -> int:
         # a relative "exe" is the config's cwd's: Windows' CreateProcess resolves "engine/strata.exe" against nothing
         # it is told about (WinError 2), so it is made absolute here
         exe = cfg["exe"] if os.path.isabs(cfg["exe"]) else os.path.abspath(os.path.join(cfg.get("cwd") or ".", cfg["exe"]))
+        env = juud_guard_engine(exe, env)
         try:
             silence = engine_silence_s(cfg)             # #481: checked before the (minutes-long) start
         except ValueError as e:

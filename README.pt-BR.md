@@ -1,3 +1,5 @@
+> **Sobre o Juud_engine:** Esta é uma tradução arquivada da documentação do Strata. Os downloads e benchmarks desta página são do Strata. Consulte o [README do Juud_engine](README.md) para a comparação medida em uma RTX 4090 e as instruções de compilação a partir do código-fonte.
+
 <h1 align="center">Strata</h1>
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · **Português**

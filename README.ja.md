@@ -1,3 +1,5 @@
+> **Juud_engine について:** このページは Strata の説明を保存した翻訳です。ここにあるダウンロード先とベンチマークは Strata のものです。Juud_engine の RTX 4090 での実測比較とソースからのビルド手順は [Juud_engine README](README.md) をご覧ください。
+
 <h1 align="center">Strata</h1>
 
 [English](README.md) · [简体中文](README.zh-CN.md) · **日本語** · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português](README.pt-BR.md)

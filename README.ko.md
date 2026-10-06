@@ -8,6 +8,19 @@ Juud_engine은 [Strata](https://github.com/Niko1221/Strata)를 바탕으로
 [`6f32ec070f23ced9f50e704d854d775da52591ab`](https://github.com/Niko1221/Strata/tree/6f32ec070f23ced9f50e704d854d775da52591ab)이며,
 원본의 MIT 저작권 표시와 라이선스를 유지합니다.
 
+## Strata 대신 Juud_engine을 시도할 이유
+
+- **이 PC에서 확인한 답변 생성 속도:** RTX 4090·IQ3_S의 기본 조건 4개 작업에서 원본 Strata 대비
+  쌍별 출력 속도 향상률 중앙값이 +3.1~9.1%였습니다. 출력이 모두 같았던 별도 보조 조건에서는
+  +9.6~15.6%였습니다. 두 조건의 설정과 한계는 아래에 구분했습니다.
+- **CPU 작업을 줄이는 두 선택형 변경:** 전문가 배치가 끝난 뒤 워커의 바쁜 대기를 줄이고,
+  일부 토큰만 CPU 전문가가 필요한 혼합 다중 토큰 배치에서 불필요한 CPU 양자화를 생략합니다.
+- **검증 가능한 사용 경로:** `RUN-JUUD`가 실행 설정의 엔진 경로와 로컬 빌드 기록·소스 지문을 확인한 뒤 두 변경을 켭니다.
+  [쌍별 측정값과 검증 스크립트](bench/results/2026-10-06-rtx4090-iq3_s/README.md)도 공개했습니다.
+
+영어로 공유할 설명은 [Why Juud?](docs/WHY_JUUD.md), 게시글 초안은
+[국제 홍보 문구](docs/LAUNCH_KIT.md)에 있습니다.
+
 ## 추가한 두 최적화
 
 두 기능은 **기본적으로 꺼져** 있으며, 이 저장소의 소스로 엔진을 빌드해야 사용할 수 있습니다.
@@ -15,26 +28,31 @@ Juud_engine은 [Strata](https://github.com/Niko1221/Strata)를 바탕으로
 | 환경변수 | 동작 |
 | --- | --- |
 | `JUUD_POOL_ADAPTIVE_SPIN=1` | CPU 전문가 배치의 gate/up 단계와 down 단계 사이에는 기존 20ms 대기 정책을 유지하고, 배치가 끝난 뒤에는 워커의 회전 대기를 100µs로 줄입니다. `STRATA_POOL_SPIN_US`를 명시하면 그 고정값이 우선합니다. |
-| `JUUD_SKIP_UNUSED_ACTQ=1` | 단일 GPU 경로에서 한 토큰의 선택된 전문가가 모두 GPU에 있을 때, CPU 전문가 작업에서 사용하지 않을 활성값 양자화를 생략합니다. |
+| `JUUD_SKIP_UNUSED_ACTQ=1` | 단일 GPU의 혼합 다중 토큰 배치에서 GPU 전용 토큰의 CPU 활성값 양자화를 생략합니다. 배치 전체에 CPU 전문가 작업이 없으면 원본 Strata도 이미 이를 생략합니다. |
 
 이 PC의 RTX 4090에서 원본 Strata와 같은 IQ3_S 모델로 [A/B 실측](bench/results/2026-10-06-rtx4090-iq3_s/README.md)을 마쳤습니다.
 두 옵션을 **함께** 켠 결과이므로 어느 옵션이 얼마나 기여했는지는 알 수 없습니다. 아래 결과는 이 장비와
-설정에서만 확인한 값입니다. [영문 README](README.md)에 보존된 원본 Strata의 다른 PC 속도 수치는
+설정에서만 확인한 값입니다. [보존된 Strata README](UPSTREAM_README.md)의 다른 PC 속도 수치는
 Juud_engine 측정값이 아닙니다.
 
 ## Windows에서 실행
 
-이 저장소의 실행 파일을 빌드하고 모델 설치를 마친 다음 PowerShell에서 다음처럼 옵션을 켤 수 있습니다.
+NVIDIA CUDA 13 Windows에서 이 저장소의 소스로 엔진을 빌드한 뒤 `RUN-JUUD.bat`로 시작하세요. 설정 중
+비교와 같은 **Qwen3.8-Flash-Next IQ3_S** 크기를 선택합니다. 처음 설치할 때와
+기존 Strata 설치를 Juud 빌드로 바꿀 때 모두 `--setup --build --no-start`를 사용합니다.
+기존 모델을 재설정할 때도 원하는 모델·크기·설정을 확인하세요. 기존 모델을 단순 시작하면서 `--build`만
+전달하면 다시 빌드하지 않습니다. 소스 빌드 도구와 대용량 모델 다운로드가 필요할 수 있습니다.
 
 ```powershell
-.\START-HERE.bat --build --no-start
-$env:JUUD_POOL_ADAPTIVE_SPIN = '1'
-$env:JUUD_SKIP_UNUSED_ACTQ = '1'
-.\START-HERE.bat
+.\START-HERE.bat --setup --build --no-start --family qwen --model IQ3_S
+.\RUN-JUUD.bat
 ```
 
-`engine/strata.exe`를 파일 탐색기에서 직접 열면 CUDA DLL 경로가 빠질 수 있습니다. 위 시작 스크립트는
-서버 설정의 CUDA 라이브러리 경로를 엔진 프로세스에 전달합니다.
+Linux의 NVIDIA CUDA 13 로컬 빌드에서도 `./setup.sh --setup --build --no-start` 뒤 `./RUN-JUUD.sh`를 사용합니다.
+`RUN-JUUD`는 로컬 빌드 기록과 선택된 실행 경로를 확인하고 두 환경변수를 켭니다. 저장된 설정의 충돌 값도
+실행 시 덮어씁니다. 빌드 기록이 Strata 사전 빌드를 가리키면 실행하지 않습니다. 다만 기록은 실행 파일의
+암호학적 검증이 아닙니다. `engine/strata.exe`를 파일 탐색기에서 직접 열면 CUDA DLL
+경로가 빠질 수 있습니다. 시작 스크립트는 서버 설정의 CUDA 라이브러리 경로를 엔진에 전달합니다.
 
 ## RTX 4090 실측 비교
 
