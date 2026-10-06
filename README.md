@@ -1,5 +1,7 @@
 # Juud_engine
 
+**English** · [한국어](README.ko.md)
+
 Juud_engine is an experimental fork of [Strata](https://github.com/Niko1221/Strata) for local
 [Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) inference. It has two **opt-in** changes:
 a CPU expert-pool parking policy that spins briefly after a completed CPU batch, and a single-GPU path that skips
