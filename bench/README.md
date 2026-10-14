@@ -65,6 +65,42 @@ If a run stops early, regenerate the summary from its saved measured rows:
 python bench/juud_compare.py summarize --out C:/path/to/results/rtx4090-iq3s-01
 ```
 
+## Isolate the two Juud switches
+
+The original two-arm comparison enabled both changes at once. To measure their separate effects,
+`juud_ablation.py` runs four independent paired comparisons: stock Strata versus Juud with both
+switches off (`00`), then that **same Juud build** at `00` versus adaptive spin only (`10`),
+activation-quantization skip only (`01`), and both (`11`). State digits correspond to
+`JUUD_POOL_ADAPTIVE_SPIN` and `JUUD_SKIP_UNUSED_ACTQ` in that order. Every launch explicitly
+unsets `STRATA_POOL_SPIN_US`, and the same-build comparisons reject differences in any other
+environment variable, launch command, working directory, URL, or engine executable. The four
+comparison batches run in a recorded seed-shuffled order. Each batch still alternates A/B order
+by pair. This takes eight server launches per pair across the four batches; allow time for model
+loading. Use a fresh output directory outside the repository.
+
+```powershell
+python bench/juud_ablation.py `
+  --strata C:/path/to/strata-launch.json `
+  --juud C:/path/to/juud-launch.json `
+  --root C:/path/to/Strata `
+  --pack D:/Strata-data/packs/iq3_s `
+  --out C:/path/to/results/ablation-01 `
+  --pairs 5
+```
+
+Add `--plan-only` to check the model configurations and print the comparison order without
+starting either server or writing data. Use `--targets 4096,32768` if the configured context
+cannot fit the default 128K case. The output root contains `ablation.md`, `ablation.json`,
+`plan.json`, copied launch configurations, and a separate `00`, `10`, `01`, and `11` directory
+with the existing raw and paired reports. The `00` result measures a build difference with
+both Juud switches off; it is not the effect of either switch. The other three results measure
+each switch state against Juud `00`. Compare output hashes, draft acceptance and telemetry
+before attributing time differences to the code. Do not subtract gain percentages across the
+separate batches or generalize to another Strata release or GPU. Raw files contain full output
+text, PC paths and possibly launch environment values; review before publishing.
+
+The no-GPU check is `python bench/test_juud_ablation.py`.
+
 ## Interpret and publish
 
 Prefill throughput is freshly processed prompt tokens divided by engine `prompt_ms`; decode throughput is engine generated tokens divided by engine `decode_ms`. TTFT is from sending the request to the first nonempty text or reasoning delta; total latency ends at stream completion. The table's positive percentage means Juud is faster: `B/A - 1` for throughput and `1 - B/A` for latency. Report each workload separately. Do not use total request time to calculate decode tok/s.

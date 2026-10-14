@@ -9,6 +9,12 @@ local inference server and adds two **opt-in** engine changes aimed at CPU work 
 with Qwen3.8-Flash-Next IQ3_S, median paired **decode throughput** improved in all four tested workloads against
 the pinned [Strata `6f32ec0`](https://github.com/Niko1221/Strata/tree/6f32ec070f23ced9f50e704d854d775da52591ab).
 
+**Comparison status (14 October 2026):** These results compare the v0.1.39 baseline only. Strata has since released
+[v0.1.44.1](https://github.com/Niko1221/Strata/releases/tag/v0.1.44.1), which has not been benchmarked against
+Juud_engine on this PC. The published percentages are not a claim of advantage over current Strata. The
+[ablation runner](bench/README.md#isolate-the-two-juud-switches) provides a way to test each Juud option separately;
+no ablation results have been published yet.
+
 ## Why try Juud_engine?
 
 1. **Measured decode gains on the tested PC.** The normal adaptive run measured +3.1% to +9.1% median paired
@@ -69,6 +75,9 @@ cd Juud_engine
 fingerprint matching this checkout. It clears any fixed `STRATA_POOL_SPIN_US` override, then enforces
 `JUUD_POOL_ADAPTIVE_SPIN=1` and `JUUD_SKIP_UNUSED_ACTQ=1`, even if a saved model config has conflicting values.
 It rejects installs recorded as Strata prebuilts; the build record is not a cryptographic attestation of the binary.
+On Windows it also checks for the CUDA cuBLAS DLL before starting, so a missing `cublas64_13.dll` produces an
+actionable error. Start with `RUN-JUUD.bat` instead of opening `engine/strata.exe` directly; the launcher carries
+the model's CUDA library configuration into the server process.
 You can pass ordinary setup/start arguments to the wrapper. The engine still exposes Strata's OpenAI-compatible local API. See the [benchmark guide](bench/README.md)
 to reproduce the comparison and [evaluation record](docs/JUUD_EVALUATION.md) for detailed provenance.
 
