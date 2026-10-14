@@ -1,18 +1,20 @@
 # Juud_engine
 
-[English](README.md) · **한국어**
+[English](README.md) · **한국어** · [소스 릴리스](https://github.com/bnkaiteam/Juud_engine/releases/tag/v0.1.44.1-juud.1) · [질문·재현 결과 공유](https://github.com/bnkaiteam/Juud_engine/discussions)
 
 Juud_engine은 [Strata](https://github.com/Niko1221/Strata) v0.1.44.1을 바탕으로
 [Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)를 로컬에서 실행하는 실험용 엔진입니다.
 아래 RTX 4090 속도 수치는 **2026-10-06에 측정한 이전 v0.1.39 기반 Juud 빌드**와
 [Strata `6f32ec0`](https://github.com/Niko1221/Strata/tree/6f32ec070f23ced9f50e704d854d775da52591ab)의 비교 결과입니다.
-현재 v0.1.44.1 코드의 속도를 입증하는 수치가 아니며, 새 버전끼리의 비교 측정은 아직 없습니다.
+현재 v0.1.44.1 코드의 속도를 입증하는 수치가 아닙니다. [새 버전끼리의 탐색적 비교](bench/results/2026-10-14-rtx4090-v01441/README.md)도 공개했지만
+대부분의 쌍에서 출력이 달라 현재 코드의 속도 우위를 입증하지는 못했습니다.
 원본의 MIT 저작권 표시와 라이선스를 유지합니다.
 
 **검증 현황(2026-10-14):** 공개된 속도 수치는 이전 v0.1.39 빌드끼리의 비교에만 해당합니다.
-현재 포트와 [Strata v0.1.44.1](https://github.com/Niko1221/Strata/releases/tag/v0.1.44.1)을 비교하지 않았으므로
-최신 버전보다 빠르다는 근거가 아닙니다. [분리 실험 도구](bench/README.md#isolate-the-two-juud-switches)로
-두 옵션의 개별 효과를 측정할 수 있지만, 새 버전의 쌍별 비교나 분리 실측 결과는 아직 공개하지 않았습니다.
+현재 포트와 [Strata v0.1.44.1](https://github.com/Niko1221/Strata/releases/tag/v0.1.44.1)의
+[쌍별 비교 자료](bench/results/2026-10-14-rtx4090-v01441/README.md)를 공개했습니다. 출력 불일치가 많아
+최신 버전보다 빠르다는 근거로 쓰지 않습니다. [분리 실험 도구](bench/README.md#isolate-the-two-juud-switches)로
+두 옵션의 개별 효과를 측정할 수 있지만, 분리 실측 결과는 아직 공개하지 않았습니다.
 
 ## Strata 대신 Juud_engine을 시도할 이유
 

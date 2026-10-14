@@ -2,20 +2,22 @@
 
 **An experimental Strata v0.1.44.1 fork with two opt-in decoding controls.**
 
-[한국어](README.ko.md) · [Why Juud?](docs/WHY_JUUD.md) · [RTX 4090 results and paired metrics](bench/results/2026-10-06-rtx4090-iq3_s/README.md)
+[한국어](README.ko.md) · [Source prerelease](https://github.com/bnkaiteam/Juud_engine/releases/tag/v0.1.44.1-juud.1) · [Why Juud?](docs/WHY_JUUD.md) · [Current v0.1.44.1 comparison](bench/results/2026-10-14-rtx4090-v01441/README.md) · [Historical v0.1.39 results](bench/results/2026-10-06-rtx4090-iq3_s/README.md) · [Discussions](https://github.com/bnkaiteam/Juud_engine/discussions)
 
 Juud_engine now incorporates [Strata](https://github.com/Niko1221/Strata) v0.1.44.1. It keeps Strata's local
 inference server and ports two **opt-in** engine changes aimed at CPU work during decoding. The published RTX 4090
 comparison below was made on **2026-10-06 with the earlier v0.1.39-based Juud build** against pinned
 [Strata `6f32ec0`](https://github.com/Niko1221/Strata/tree/6f32ec070f23ced9f50e704d854d775da52591ab).
-The v0.1.44.1 port has not yet been benchmarked against v0.1.44.1 Strata; the historical percentages are not
-performance claims for the current code.
+An [exploratory v0.1.44.1 pair comparison](bench/results/2026-10-14-rtx4090-v01441/README.md) is now available.
+Most paired outputs differed, so it does not establish a speed advantage for the current code. The historical
+percentages are not performance claims for this release.
 
 **Evaluation status (14 October 2026):** The published percentages belong only to the historical v0.1.39 pair.
 They do not establish an advantage for the current v0.1.44.1 port over stock
 [Strata v0.1.44.1](https://github.com/Niko1221/Strata/releases/tag/v0.1.44.1). The
-[ablation runner](bench/README.md#isolate-the-two-juud-switches) can test each option separately, but no current
-paired benchmark or individual-option result has been published yet.
+[ablation runner](bench/README.md#isolate-the-two-juud-switches) can test each option separately. The
+[current paired measurements](bench/results/2026-10-14-rtx4090-v01441/README.md) are exploratory because output
+parity was limited; individual-option performance has not been measured.
 
 ## Why try Juud_engine?
 
@@ -53,8 +55,8 @@ individual ablation. See the [full method, latencies, limitations, and public pa
 ## Run the current v0.1.44.1 port
 
 For NVIDIA CUDA 13 on Windows, first build the engine from this source and choose the Qwen3.8-Flash-Next **IQ3_S**
-model size in setup. This model size matches the historical comparison, but this port still needs a new paired
-benchmark against v0.1.44.1 Strata. Setup may need build tools and a large separate model download.
+model size in setup. This model size matches the historical comparison; a larger output-matched benchmark and
+per-option ablation are still needed for the v0.1.44.1 port. Setup may need build tools and a large separate model download.
 When reconfiguring an existing install, select the intended model, size and settings. Re-run the setup command after
 a source update or when converting an existing Strata install; `--build` alone on an ordinary start of an installed
 model does **not** rebuild.
