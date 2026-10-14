@@ -1,5 +1,11 @@
 # Juud_engine evaluation on an RTX 4090
 
+**Historical benchmark, not a measurement of the current port.** The results below compare Strata v0.1.39
+(`6f32ec0`) with Juud_engine binaries built from the 2026-10-06 v0.1.39 fork. The current source incorporates
+Strata v0.1.44.1 and ports the two opt-in controls onto it. No paired performance or output-equivalence result
+for that v0.1.44.1 port has been published. Keep the measured commits, binary hashes and percentages below tied
+to the original experiment.
+
 **Status (2026-10-06):** a five-pair main comparison and a separate three-pair output-reproducibility control
 completed on one RTX 4090. All 32 A/B pairs passed the runner's validity checks. See the
 [published reports and privacy-reduced paired metrics](../bench/results/2026-10-06-rtx4090-iq3_s/README.md) and the

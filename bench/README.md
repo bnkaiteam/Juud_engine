@@ -5,11 +5,21 @@
 The [2026-10-06 RTX 4090 comparison](results/2026-10-06-rtx4090-iq3_s/README.md) publishes completed reports,
 privacy-reduced paired metrics and provenance hashes. Full raw records and exact launch files remain in a local ZIP
 because they include PC paths and complete generated text. The main and output-reproducibility control results use
-different engine settings and are reported separately.
+different engine settings and are reported separately. Those measurements used **Strata v0.1.39 and a
+v0.1.39-based Juud_engine binary**. This checkout now incorporates Strata v0.1.44.1 and ports the two Juud
+controls; it has no published paired result against stock v0.1.44.1. Running this harness on current builds
+would produce a new experiment, not reproduce the historical percentages.
 
 ## Prepare the two builds
 
-Pin the Strata commit and the Juud_engine commit. Build both using the same compiler, CUDA version and build options. Use the same model files and pack, exact `strata-iq3_s.json` settings, context, KV type, MTP draft vocabulary, expert profile, cache size, prefill setting, and vision setting. Keep both servers on loopback, with no API key during this local benchmark. Each server needs its own checkout and prepared Python environment; both can point to the same model data. Do not start either server manually.
+Pin the Strata commit and the Juud_engine commit. To reproduce the 2026-10-06 comparison, use the exact commits
+and binary provenance in its [evaluation record](../docs/JUUD_EVALUATION.md); do not substitute this newer checkout.
+For a new v0.1.44.1 comparison, use stock Strata v0.1.44.1 as A and this port as B, and report the results
+separately. Build both using the same compiler, CUDA version and build options. Use the same model files and pack,
+exact `strata-iq3_s.json` settings, context, KV type, MTP draft vocabulary, expert profile, cache size, prefill
+setting, and vision setting. Keep both servers on loopback, with no API key during this local benchmark. Each server
+needs its own checkout and prepared Python environment; both can point to the same model data. Do not start either
+server manually.
 
 Create two local JSON files outside the repository, for example `strata-launch.json` and `juud-launch.json`. Each needs an argument array, a working directory and the same loopback URL. Example for Strata on Windows:
 

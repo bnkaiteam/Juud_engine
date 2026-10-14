@@ -1,9 +1,10 @@
 # One H100 with 94 GB: Qwen3.8-Flash-Next
 
-This guide applies to Juud_engine's fork of **Strata v0.1.39 at
+This is a capacity assessment originally written for Juud_engine's **Strata v0.1.39 base at
 [`6f32ec070f23ced9f50e704d854d775da52591ab`](https://github.com/Niko1221/Strata/tree/6f32ec070f23ced9f50e704d854d775da52591ab)**.
-The links to Strata below use that commit, not the changing `main` branch. An H100 run of this fork has **not been
-measured or validated**; the fit guidance below follows the published model sizes and the engine's memory layout.
+The current Juud_engine source incorporates Strata v0.1.44.1. Neither the earlier fork nor the v0.1.44.1 port
+has been run or validated on an H100, and the fit estimates below have not been rechecked against the current
+engine. The pinned Strata links preserve the assumptions behind the original estimates.
 
 ## What fits
 
@@ -26,15 +27,16 @@ at that RAM level. A 64 GB host can run IQ3_S but leaves little RAM for other wo
 installer's low-RAM mode can map experts from files and keep only the experts absent from the GPU in RAM; verify its
 chosen mode and memory use on the actual host.
 
-Strata also offers [Unsloth UD-IQ4_XS](https://github.com/Niko1221/Strata/blob/6f32ec070f23ced9f50e704d854d775da52591ab/docs/MODELS.md#unsloth-ud-iq4_xs)
+The pinned v0.1.39 docs also offer [Unsloth UD-IQ4_XS](https://github.com/Niko1221/Strata/blob/6f32ec070f23ced9f50e704d854d775da52591ab/docs/MODELS.md#unsloth-ud-iq4_xs)
 as a larger quantization: its **94 GB figure is a download size**, with 59.5 GB of experts. It needs at least 48 GB
-host RAM; Strata says roughly 80 GB RAM keeps its experts off the SSD. Treat its H100 fit as unverified until startup
-and a long request succeed. The still larger UD-Q4_K_XL is experimental and relies on an NVMe/host-RAM expert budget;
-do not infer that a 94 GB H100 can keep its entire runtime in VRAM from the quantization name or download size.
+host RAM; the pinned guide says roughly 80 GB RAM keeps its experts off the SSD. Treat its H100 fit as unverified
+until startup and a long request succeed. The larger UD-Q4_K_XL relies on an NVMe/host-RAM expert budget; current
+[model guidance](MODELS.md#unsloths-files-ud-iq4_xs-to-q8_0) covers additional Unsloth choices. Do not infer
+that a 94 GB H100 can keep its entire runtime in VRAM from the quantization name or download size.
 
 ## Where the data lives
 
-In the standard layout, dense weights, the MTP draft runtime, active KV data and a cache of hot experts use VRAM.
+In the pinned v0.1.39 layout, dense weights, the MTP draft runtime, active KV data and a cache of hot experts use VRAM.
 The full expert set is also held in host RAM; the GPU expert cache consumes the free VRAM after other allocations, so
 its actual slot count must be read from the startup log. At contexts of 64K or more, setup can stream most KV data
 from host RAM. The separate **about 29 GB n-gram lookup shard stays on SSD**. Keep the model files, pack and MTP files
@@ -45,10 +47,11 @@ a GPU + RAM + SSD engine even if a large expert cache fits on the H100
 
 ## Build and validate
 
-Build the engine **from this Juud_engine checkout** for H100's `sm_90` architecture. For CMake, set
+For a trial of the current v0.1.44.1 port, build the engine **from this Juud_engine checkout** for H100's `sm_90`
+architecture. Treat this as a new validation, not a reproduction of the v0.1.39 benchmark. For CMake, set
 `-DCMAKE_CUDA_ARCHITECTURES=90`; for the repository's Dockerfile, use
 `docker build -t juud-h100 --build-arg CUDA_ARCHITECTURES=90 .`. The Docker default architectures omit `90`, and
-the [pinned install guide](https://github.com/Niko1221/Strata/blob/6f32ec070f23ced9f50e704d854d775da52591ab/docs/INSTALL.md#docker-linux)
+the [current install guide](INSTALL.md#docker-linux)
 requires a rebuild for an omitted card. Its CUDA 13 Docker image requires an NVIDIA driver of at least 580. Confirm
 that the resulting binary is the **locally built Juud_engine** binary before testing its opt-in changes.
 
@@ -57,8 +60,8 @@ that the resulting binary is the **locally built Juud_engine** binary before tes
    slots, and free VRAM. Run a request that actually approaches the 128K limit.
 2. Reconfigure with `START-HERE.bat --setup --context 262144` on Windows or
    `./setup.sh --setup --context 262144` on Linux. Check RAM and VRAM use during a request that approaches the full native
-   context, plus correct completion and output. For IQ3_XXS and IQ3_S, Strata has **no published 262K measurement** and
-   recommends 128K on a 64 GB RAM host by its estimate
+   context, plus correct completion and output. For IQ3_XXS and IQ3_S, the pinned v0.1.39 Strata docs had
+   **no published 262K measurement** and recommended 128K on a 64 GB RAM host by their estimate
    ([pinned context notes](https://github.com/Niko1221/Strata/blob/6f32ec070f23ced9f50e704d854d775da52591ab/docs/DETAILS.md#speed-measured)).
 
 No H100 throughput, latency or Juud_engine-versus-Strata speedup is implied by this guide. Record exact GPU variant,
