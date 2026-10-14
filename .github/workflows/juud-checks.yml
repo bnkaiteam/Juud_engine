@@ -1,0 +1,26 @@
+name: Juud CPU checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  launcher-and-setup:
+    name: Launcher and setup (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run GPU-free regression checks
+        run: |
+          python -m unittest tools.test_juud_guard tools.test_juud_cuda_preflight tools.test_setup_prompts tools.test_setup_config
+          python bench/test_juud_ablation.py

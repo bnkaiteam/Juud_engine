@@ -316,10 +316,11 @@ def engine_config(launch: dict, pack: Path) -> tuple[dict, dict]:
                         int(args[args.index("--max-context") + 1]) if "--max-context" in args else None}
 
 
-def compare_engine_configs(a: dict, b: dict, pack: Path, required_context: int) -> dict:
+def compare_engine_configs(a: dict, b: dict, pack: Path, required_context: int,
+                           allow_same_executable: bool = False) -> dict:
     a_comparable, a_info = engine_config(a, pack)
     b_comparable, b_info = engine_config(b, pack)
-    if a_info["exe"].casefold() == b_info["exe"].casefold():
+    if a_info["exe"].casefold() == b_info["exe"].casefold() and not allow_same_executable:
         raise ValueError("A and B point to the same engine executable; this would not compare two builds")
     if a_comparable != b_comparable:
         keys = sorted(k for k in set(a_comparable) | set(b_comparable)
@@ -332,6 +333,23 @@ def compare_engine_configs(a: dict, b: dict, pack: Path, required_context: int) 
                              f"{required_context} tokens (prompt + output cap + 8)")
     return {"A": a_info, "B": b_info, "normalized_inference_config_sha256":
             sha256(json.dumps(a_comparable, sort_keys=True, ensure_ascii=False).encode("utf-8"))}
+
+
+def validate_same_build_ablation(a: dict, b: dict) -> None:
+    """Require identical launches except explicit Juud option switches."""
+    if a["command"] != b["command"] or a["cwd"] != b["cwd"] or a["url"] != b["url"]:
+        raise ValueError("same-build ablation requires identical command, cwd and URL")
+    flags = ("JUUD_POOL_ADAPTIVE_SPIN", "JUUD_SKIP_UNUSED_ACTQ")
+    a_env, b_env = a.get("env", {}), b.get("env", {})
+    if a_env.get("STRATA_POOL_SPIN_US", "missing") is not None or b_env.get("STRATA_POOL_SPIN_US", "missing") is not None:
+        raise ValueError("same-build ablation requires STRATA_POOL_SPIN_US explicitly unset in both arms")
+    for key in flags:
+        if a_env.get(key) not in ("0", "1") or b_env.get(key) not in ("0", "1"):
+            raise ValueError(f"same-build ablation requires explicit 0 or 1 for {key} in both arms")
+    if all(a_env[key] == b_env[key] for key in flags):
+        raise ValueError("same-build ablation must change at least one Juud option")
+    if {k: v for k, v in a_env.items() if k not in flags} != {k: v for k, v in b_env.items() if k not in flags}:
+        raise ValueError("same-build ablation environment differs beyond the two Juud options")
 
 
 def wait_ready(proc: subprocess.Popen, url: str, timeout_s: float) -> tuple[float, dict]:
@@ -481,7 +499,12 @@ def summarize(out: Path) -> dict:
     rows = [json.loads(line) for line in rows_file.read_text(encoding="utf-8").splitlines() if line.strip()]
     lookup = {(row["pair"], row["case"], row["engine"]): row for row in rows}
     cases = sorted({row["case"] for row in rows})
-    summary = {"source": str(rows_file), "rows": len(rows), "cases": {}}
+    manifest_file = out / "manifest.json"
+    manifest = json.loads(manifest_file.read_text(encoding="utf-8")) if manifest_file.exists() else {}
+    a_label = manifest.get("A_label", "Strata")
+    b_label = manifest.get("B_label", "Juud_engine")
+    summary = {"source": str(rows_file), "rows": len(rows), "A_label": a_label,
+               "B_label": b_label, "cases": {}}
     for case in cases:
         pairs = sorted({row["pair"] for row in rows if row["case"] == case})
         valid = []
@@ -503,11 +526,13 @@ def summarize(out: Path) -> dict:
                 "A": median_range([a for a, _ in filtered]),
                 "B": median_range([b for _, b in filtered]),
                 "paired_juud_gain_percent": median_range(gains),
+                "paired_B_gain_percent": median_range(gains),
                 "paired_gains_percent": gains,
             }
         summary["cases"][case] = report
     write_json(out / "summary.json", summary)
-    lines = ["# Paired RTX benchmark summary", "", "A = Strata; B = Juud_engine. Positive gain means Juud is faster.",
+    lines = ["# Paired RTX benchmark summary", "",
+              f"A = {a_label}; B = {b_label}. Positive gain means B is faster than A.",
              "Model startup is excluded from request timing. Invalid or incomplete pairs are excluded from medians.", "",
              "| Workload | Valid pairs | Prefill tok/s A → B | Decode tok/s A → B | TTFT s A → B | Total s A → B | Paired gains (prefill / decode / TTFT / total) |",
              "| --- | ---: | --- | --- | --- | --- | --- |"]
@@ -540,7 +565,12 @@ def run(args: argparse.Namespace) -> None:
     if a["url"] != b["url"]:
         raise ValueError("A and B must use the same loopback URL because only one server runs at a time")
     required_context = max([*targets, args.ko_target]) + args.max_tokens + 8
-    config_check = compare_engine_configs(a, b, args.pack, required_context)
+    if args.same_build_ablation:
+        validate_same_build_ablation(a, b)
+    config_check = compare_engine_configs(a, b, args.pack, required_context,
+                                          allow_same_executable=args.same_build_ablation)
+    if args.same_build_ablation and config_check["A"]["exe"].casefold() != config_check["B"]["exe"].casefold():
+        raise ValueError("same-build ablation must use the same engine executable in both arms")
     try:
         get_json(a["url"] + "/health", timeout=2)
     except (OSError, ValueError, urllib.error.HTTPError):
@@ -558,9 +588,11 @@ def run(args: argparse.Namespace) -> None:
                                         "max_tokens": args.max_tokens, "root": str(args.root.resolve()),
                                         "pack": str(args.pack.resolve()),
                                         "A_launch_config": str(args.a.resolve()), "B_launch_config": str(args.b.resolve()),
-                                        "A_config_sha256": sha256(args.a.read_bytes()),
-                                        "B_config_sha256": sha256(args.b.read_bytes()),
-                                        "inference_config_check": config_check,
+                                         "A_config_sha256": sha256(args.a.read_bytes()),
+                                         "B_config_sha256": sha256(args.b.read_bytes()),
+                                         "A_label": args.a_label, "B_label": args.b_label,
+                                         "same_build_ablation": args.same_build_ablation,
+                                         "inference_config_check": config_check,
                                         "required_context": required_context,
                                         "gpu_sampling": {"enabled": args.gpu_sample_interval > 0,
                                                          "interval_s": args.gpu_sample_interval,
@@ -644,6 +676,10 @@ def main() -> int:
     runner = sub.add_parser("run", help="launch A and B serially, alternating order by pair")
     runner.add_argument("--a", type=Path, required=True, help="Strata launch JSON")
     runner.add_argument("--b", type=Path, required=True, help="Juud launch JSON")
+    runner.add_argument("--same-build-ablation", action="store_true",
+                        help="allow one Juud executable in both arms when only the two explicit Juud flags differ")
+    runner.add_argument("--a-label", default="Strata", help="label for A in summary")
+    runner.add_argument("--b-label", default="Juud_engine", help="label for B in summary")
     runner.add_argument("--root", type=Path, required=True, help="source root used only for the shared tokenizer")
     runner.add_argument("--pack", type=Path, required=True, help="shared IQ3_S pack directory")
     runner.add_argument("--out", type=Path, required=True, help="new output directory")

@@ -8,6 +8,11 @@ Juud_engine은 [Strata](https://github.com/Niko1221/Strata)를 바탕으로
 [`6f32ec070f23ced9f50e704d854d775da52591ab`](https://github.com/Niko1221/Strata/tree/6f32ec070f23ced9f50e704d854d775da52591ab)이며,
 원본의 MIT 저작권 표시와 라이선스를 유지합니다.
 
+**비교 기준 안내(2026-10-14):** 아래 속도 수치는 Strata v0.1.39와 비교한 것입니다. 이후 공개된
+[Strata v0.1.44.1](https://github.com/Niko1221/Strata/releases/tag/v0.1.44.1)과는 이 PC에서 다시 측정하지
+않았습니다. 따라서 최신 Strata보다 빠르다는 주장은 아닙니다. 두 옵션의 개별 효과를 확인하는
+[분리 실험 도구](bench/README.md#isolate-the-two-juud-switches)를 추가했지만 아직 실측 결과는 공개하지 않았습니다.
+
 ## Strata 대신 Juud_engine을 시도할 이유
 
 - **이 PC에서 확인한 답변 생성 속도:** RTX 4090·IQ3_S의 기본 조건 4개 작업에서 원본 Strata 대비
@@ -52,7 +57,8 @@ Linux의 NVIDIA CUDA 13 로컬 빌드에서도 `./setup.sh --setup --build --no-
 `RUN-JUUD`는 로컬 빌드 기록과 선택된 실행 경로를 확인하고 두 환경변수를 켭니다. 저장된 설정의 충돌 값도
 실행 시 덮어씁니다. 빌드 기록이 Strata 사전 빌드를 가리키면 실행하지 않습니다. 다만 기록은 실행 파일의
 암호학적 검증이 아닙니다. `engine/strata.exe`를 파일 탐색기에서 직접 열면 CUDA DLL
-경로가 빠질 수 있습니다. 시작 스크립트는 서버 설정의 CUDA 라이브러리 경로를 엔진에 전달합니다.
+경로가 빠질 수 있습니다. `RUN-JUUD.bat`는 시작 전에 `cublas64_13.dll`을 찾을 수 있는지 검사하고,
+시작 스크립트는 서버 설정의 CUDA 라이브러리 경로를 엔진에 전달합니다.
 
 ## RTX 4090 실측 비교
 
