@@ -1,5 +1,5 @@
 @echo off
-rem Start a locally recorded Juud build with the two measured opt-in engine changes.
+rem Start a locally recorded Juud build with the two opt-in engine changes.
 setlocal
 cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" (

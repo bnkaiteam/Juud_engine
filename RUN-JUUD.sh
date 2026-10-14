@@ -1,5 +1,5 @@
 #!/bin/sh
-# Start a locally recorded Juud build with the two measured opt-in engine changes.
+# Start a locally recorded Juud build with the two opt-in engine changes.
 set -eu
 cd "$(dirname "$0")"
 if [ ! -x .venv/bin/python ]; then
